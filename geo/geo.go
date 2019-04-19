@@ -1,4 +1,4 @@
-package main
+package geo
 
 import (
 	"encoding/json"
@@ -73,29 +73,98 @@ func getConf() Configuration {
 	return configuration
 }
 
-func (b BaiduAPI) GetGeo(address string) (BaiduAPI, error) {
-	var URL string = "http://api.map.baidu.com/geocoder/v2/"
-	var TOKEN string = getConf().Token.Baidu
-	var KEYNAME string = "ak"
-	err := apiCall(address, URL, TOKEN, KEYNAME, &b)
-	if err != nil {
-		return b, err
-	}
-	return b, nil
+type MapConfiger struct {
+	Url       string
+	Token     string
+	Keyname   string
+	ApiStruct ApiStructor
 }
 
-func (b QQAPI) GetGeo(address string) (QQAPI, error) {
-	var URL string = "https://apis.map.qq.com/ws/geocoder/v1/"
-	var TOKEN string = getConf().Token.Qq
-	var KEYNAME string = "key"
-	err := apiCall(address, URL, TOKEN, KEYNAME, &b)
-	if err != nil {
-		return b, err
-	}
-	return b, nil
+type ApiStructor interface {
+	isSuccess() bool
+	getInfo() string
+	getLng() float64
+	getLat() float64
 }
 
-func apiCall(address string, apiurl string, token string, keyname string, b interface{}) error {
+func (q *QQAPI) isSuccess() bool {
+	if q.Status == 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (b *BaiduAPI) isSuccess() bool {
+	if b.Status == 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (q *QQAPI) getInfo() string {
+	return "QQAPI"
+}
+
+func (b *BaiduAPI) getInfo() string {
+	return "BaiduAPI"
+}
+
+func (q *QQAPI) getLng() float64 {
+	return q.Result.Location.Lng
+}
+
+func (q *QQAPI) getLat() float64 {
+	return q.Result.Location.Lat
+}
+
+func (b *BaiduAPI) getLng() float64 {
+	return b.Result.Location.Lng
+}
+
+func (b *BaiduAPI) getLat() float64 {
+	return b.Result.Location.Lat
+}
+
+func GetGeo(address string) (ApiStructor, error) {
+	const DEFAULTLAT = 31.40527 // Shanghai
+	const DEFAULTLNG = 121.48941
+	var maps = []MapConfiger{
+		MapConfiger{
+			Url:       "https://apis.map.qq.com/ws/geocoder/v1/",
+			Token:     getConf().Token.Qq,
+			Keyname:   "key",
+			ApiStruct: &QQAPI{},
+		},
+		MapConfiger{
+			Url:       "http://api.map.baidu.com/geocoder/v2/",
+			Token:     getConf().Token.Baidu,
+			Keyname:   "ak",
+			ApiStruct: &BaiduAPI{},
+		},
+	}
+
+	for _, m := range maps {
+		if b, err := apiCall(address, m.Url, m.Token, m.Keyname); err == nil {
+			json.Unmarshal(b, &m.ApiStruct)
+			if m.ApiStruct.isSuccess() {
+				log.Printf("Success get data from %v \n", m.ApiStruct.getInfo())
+				return m.ApiStruct, nil
+			}
+		} else {
+			log.Println(err)
+		}
+	}
+
+	log.Println("no success returned from api return default lat lng...")
+	v := QQAPI{}
+	v.Result.Location.Lat = DEFAULTLAT
+	v.Result.Location.Lng = DEFAULTLNG
+	return &v, nil
+}
+
+func apiCall(address string, apiurl string, token string, keyname string) ([]byte, error) {
 	params := url.Values{}
 
 	Url, err := url.Parse(apiurl)
@@ -114,32 +183,15 @@ func apiCall(address string, apiurl string, token string, keyname string, b inte
 
 	Url.RawQuery = params.Encode()
 	urlPath := Url.String()
-	fmt.Println(urlPath)
 	res, err := http.Get(urlPath)
 	if err != nil {
 		log.Printf("The HTTP request failed with error %s\n", err)
-	} else {
-		defer res.Body.Close()
-		s, err := ioutil.ReadAll(res.Body)
-		log.Println(string(s))
-		if err != nil {
-			panic(err.Error())
-		}
-		e := json.Unmarshal(s, &b)
-		if e != nil {
-			panic(e.Error())
-		}
 	}
-	return err
+	defer res.Body.Close()
+	return ioutil.ReadAll(res.Body)
 }
 
-func main() {
-	a := BaiduAPI{}
-	res, err := a.GetGeo("上海市黄浦区")
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Printf("维度：%f, 经度：%f\n", res.Result.Location.Lat, res.Result.Location.Lng)
-	}
-
-}
+//func main() {
+//	res, _ := GetGeo("南京环亚医疗美容门诊部有限公司")
+//	fmt.Println(res.getLat(), res.getLng())
+//}
