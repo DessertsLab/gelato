@@ -1,0 +1,21 @@
+{
+    "province": ["data", "ISPNUM", "province"],  
+    "city": ["data", "ISPNUM", "city"],  
+    "isp": ["data", "ISPNUM", "isp"],  
+    "network_duration": [
+        "data",
+        "RSL",
+        ["IFT", "A3"],
+        "RS",
+        "desc"
+    ],  
+    "verify_result": [
+        "data",
+        "RSL",
+        ["IFT", "B7"],
+        "RS",
+        "desc"
+    ],  
+    "code": ["code"],  
+    "msg": ["msg"]
+}
