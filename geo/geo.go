@@ -60,8 +60,15 @@ type qqAPI struct {
 	} `json:"result"`
 }
 
-func getConf() configuration {
-	file, openfileerr := os.Open("conf/config.json")
+func getConf(args ...string) configuration {
+	var path string
+	if len(args) != 0 {
+		path = args[0]
+	} else {
+		path = "conf/config.json"
+	}
+
+	file, openfileerr := os.Open(path)
 	defer file.Close()
 	if openfileerr != nil {
 		log.Println(openfileerr)
